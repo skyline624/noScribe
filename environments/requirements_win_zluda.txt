@@ -3,10 +3,11 @@
 # ZLUDA translates CUDA calls to ROCm at runtime
 # Note: Requires ZLUDA to be installed and ZLUDA_PATH environment variable set
 
-# PyTorch with CUDA 12.1 support (ZLUDA will translate to ROCm)
---index-url https://download.pytorch.org/whl/cu121
-torch==2.5.1+cu121
-torchaudio==2.5.1+cu121
+# PyTorch with CUDA 12.8 support (ZLUDA will translate to ROCm)
+# Using torch 2.8 with CUDA 12.8 (pyannote 4.0 requires torch>=2.8, does not work with torch 2.9)
+--index-url https://download.pytorch.org/whl/cu128
+torch==2.8.0+cu128
+torchaudio==2.8.0+cu128
 
 # Standard dependencies (from PyPI)
 --extra-index-url https://pypi.org/simple
