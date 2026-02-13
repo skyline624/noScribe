@@ -37,7 +37,7 @@ pip install -r environments/requirements_win_cpu.txt
 # Windows - NVIDIA CUDA version
 pip install -r environments/requirements_win_cuda.txt
 
-# Windows - AMD ROCm version (RX 6800 series)
+# Windows - AMD ROCm version (RX 6800 series) - ROCm 6.2 + PyTorch 2.5.1
 pip install -r environments/requirements_win_rocm.txt
 
 # Other platforms: see environments/requirements_*.txt

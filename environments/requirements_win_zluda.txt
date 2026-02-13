@@ -1,14 +1,14 @@
-# Install with `pip install -r requirements_win_rocm.txt`
-# ROCm support for AMD GPUs (RX 6800 series) on Windows
-# Note: ROCm on Windows requires AMD GPU drivers and ROCm SDK installed
-# Tested with ROCm 6.2 - PyTorch 2.5
+# Install with `pip install -r requirements_win_zluda.txt`
+# ZLUDA support for AMD GPUs (RX 6800 series) on Windows
+# ZLUDA translates CUDA calls to ROCm at runtime
+# Note: Requires ZLUDA to be installed and ZLUDA_PATH environment variable set
 
-# PyTorch ROCm - Whisper will use ROCm via PyTorch backend
---index-url https://download.pytorch.org/whl/rocm6.2
+# PyTorch with CUDA support (ZLUDA will translate to ROCm)
+--index-url https://download.pytorch.org/whl/cu121
 torch==2.5.1
 torchaudio==2.5.1
 
-# Standard dependencies (from PyPI) - must use extra-index-url
+# Standard dependencies (from PyPI)
 --extra-index-url https://pypi.org/simple
 AdvancedHTMLParser
 appdirs
