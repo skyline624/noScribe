@@ -51,7 +51,15 @@ def whisper_proc_entrypoint(args: dict, q):
                 device = 'auto'
             elif platform.system() in ('Windows', 'Linux'):
                 try:
-                    device = 'cuda' if torch.cuda.is_available() and torch.cuda.device_count() > 0 else 'cpu'
+                    if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+                        # Check for ROCm/HIP (AMD GPU)
+                        if torch.version.hip:
+                            device = 'cuda'  # ROCm uses 'cuda' device name via HIP compatibility layer
+                            plog("info", "ROCm (HIP) detected - using AMD GPU for Whisper")
+                        else:
+                            device = 'cuda'  # Native NVIDIA CUDA
+                    else:
+                        device = 'cpu'
                 except:
                     device = 'cpu'
             else:
@@ -189,7 +197,7 @@ def whisper_proc_entrypoint(args: dict, q):
         except Exception:
             pass
         try:
-            torch.cuda.empty_cache()
+            torch.cuda.empty_cache()  # Works for both CUDA and ROCm (HIP)
         except Exception:
             pass
         gc.collect()

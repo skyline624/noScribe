@@ -1,0 +1,23 @@
+# Install with `pip install -r requirements_win_rocm.txt`
+# ROCm 7.0 Windows support for AMD GPUs (RX 6800 series)
+# Note: ROCm on Windows requires AMD GPU drivers and ROCm SDK installed
+
+# PyTorch ROCm - Whisper will use ROCm via PyTorch backend
+--index-url https://download.pytorch.org/whl/rocm7.0
+torch==2.8
+torchaudio==2.8
+
+# Standard dependencies (from PyPI)
+AdvancedHTMLParser
+appdirs
+cpufeature
+customtkinter
+CTkToolTip
+faster-whisper
+Pillow
+pyannote.audio>=4.0
+pyinstaller==6.14.1
+# The bootloader in the most recent version of pyinstaller is often falsely detected as malware
+# by anti virus software, so, it's safer to use a version that has been released a few months ago.
+python-i18n
+PyYAML

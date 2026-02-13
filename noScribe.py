@@ -38,7 +38,7 @@ import locale
 import appdirs
 from subprocess import run, Popen, PIPE, STDOUT, DEVNULL
 if platform.system() == 'Windows':
-    # import torch.cuda # to check with torch.cuda.is_available()
+    import torch
     from subprocess import STARTUPINFO, STARTF_USESHOWWINDOW
 #if platform.system() in ("Windows", "Linux"):
 #    from ctranslate2 import get_cuda_device_count
@@ -208,6 +208,15 @@ _CUDA_ERROR_KEYWORDS = (
     'hip error',
 )
 
+_ROCM_ERROR_KEYWORDS = (
+    'hip',
+    'rocm',
+    'amd gpu',
+    'hip error',
+    'hip runtime',
+    'rocm runtime',
+)
+
 def _is_cuda_error_message(message: str) -> bool:
     if not message:
         return False
@@ -215,6 +224,15 @@ def _is_cuda_error_message(message: str) -> bool:
         return False
     lower_message = message.lower()
     return any(keyword in lower_message for keyword in _CUDA_ERROR_KEYWORDS)
+
+def _is_rocm_error_message(message: str) -> bool:
+    """Check if error message indicates a ROCm/HIP (AMD GPU) error"""
+    if not message:
+        return False
+    if message.find('(device_cpu)') != -1:
+        return False
+    lower_message = message.lower()
+    return any(keyword in lower_message for keyword in _ROCM_ERROR_KEYWORDS)
 
 def version_higher(version1, version2, subversion_level=99) -> int:
     """Will return 
@@ -466,7 +484,9 @@ class TranscriptionJob:
         self.pause_marker: str = '.'
         self.auto_save: bool = True
         self.whisper_xpu: str = 'cpu' 
+        self.pyannote_xpu: str = 'cpu'
         self.vad_threshold: float = 0.5
+        self.rocm_mode: bool = False  # True if using ROCm (AMD GPU)
         
         # Derived properties
         self.file_ext: str = ''
@@ -742,22 +762,45 @@ def create_transcription_job(audio_file=None, transcript_file=None, start_time=N
     job.vad_threshold = float(get_config('voice_activity_detection_threshold', '0.5'))
     
     # Platform-specific XPU settings
-    """    
     if platform.system() == "Darwin":  # MAC
         xpu = get_config('pyannote_xpu', 'mps' if platform.mac_ver()[0] >= '12.3' else 'cpu')
         job.pyannote_xpu = 'mps' if xpu == 'mps' else 'cpu'
+        whisper_xpu = get_config('whisper_xpu', 'mps' if platform.mac_ver()[0] >= '12.3' else 'cpu')
+        job.whisper_xpu = 'mps' if whisper_xpu == 'mps' else 'cpu'
     elif platform.system() in ('Windows', 'Linux'):
+        # Check for ROCm/HIP (AMD GPU)
+        rocm_available = False
         try:
-            cuda_available = torch.cuda.is_available() and get_cuda_device_count() > 0
+            if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+                if torch.version.hip:
+                    rocm_available = True
+                    rocm_version = torch.version.hip
         except:
-            cuda_available = False
-        xpu = get_config('pyannote_xpu', 'cuda' if cuda_available else 'cpu')
-        job.pyannote_xpu = 'cuda' if xpu == 'cuda' else 'cpu'
-        whisper_xpu = get_config('whisper_xpu', 'cuda' if cuda_available else 'cpu')
-        job.whisper_xpu = 'cuda' if whisper_xpu == 'cuda' else 'cpu'
+            rocm_available = False
+        
+        if rocm_available and not force_whisper_cpu:
+            # ROCm mode: Whisper on GPU (via HIP), PyAnnote on CPU
+            job.whisper_xpu = 'cuda'  # ROCm uses 'cuda' device via HIP
+            job.pyannote_xpu = 'cpu'  # PyAnnote stays on CPU for stability
+            job.rocm_mode = True
+        elif force_whisper_cpu or force_pyannote_cpu:
+            # CPU mode (forced)
+            job.whisper_xpu = 'cpu'
+            job.pyannote_xpu = 'cpu'
+            job.rocm_mode = False
+        else:
+            # Check for native CUDA
+            try:
+                cuda_available = torch.cuda.is_available() and torch.cuda.device_count() > 0
+            except:
+                cuda_available = False
+            xpu = get_config('pyannote_xpu', 'cuda' if cuda_available else 'cpu')
+            job.pyannote_xpu = 'cuda' if xpu == 'cuda' else 'cpu'
+            whisper_xpu = get_config('whisper_xpu', 'cuda' if cuda_available else 'cpu')
+            job.whisper_xpu = 'cuda' if whisper_xpu == 'cuda' else 'cpu'
+            job.rocm_mode = False
     else:
         raise Exception('Platform not supported yet.')
-    """    
     
     # Check for invalid VTT options
     if job.file_ext == 'vtt' and (job.pause > 0 or job.overlapping or job.timestamps):
@@ -2630,7 +2673,7 @@ class App(ctk.CTk):
                                 diarization = self._run_diarize_subprocess(tmp_audio_file, job)
                                 break
                             except Exception as err:
-                                if self._handle_cuda_fallback('pyannote', err):
+                                if self._handle_gpu_fallback('pyannote', err):
                                     self.logn(t('pyannote_cuda_retry'), 'highlight')
                                     continue
                                 raise
@@ -2952,7 +2995,7 @@ class App(ctk.CTk):
                         self.logn()
                         self.logn(t('transcription_finished'), 'highlight')
                     except Exception as err:
-                        if self._handle_cuda_fallback('whisper', err):
+                        if self._handle_gpu_fallback('whisper', err):
                             retry_cuda = True
                         else:
                             raise
@@ -3031,10 +3074,28 @@ class App(ctk.CTk):
             self.logn(f'Error starting transcription: {str(e)}', 'error')
             tk.messagebox.showerror(title='noScribe', message=f'Error starting transcription: {str(e)}')
 
-    def _handle_cuda_fallback(self, component: str, error: Exception) -> bool:
+    def _handle_gpu_fallback(self, component: str, error: Exception) -> bool:
+        """Handle GPU errors (CUDA or ROCm) and fallback to CPU automatically"""
         global force_pyannote_cpu
         global force_whisper_cpu
         message = str(error).strip()
+        
+        # Check for ROCm/HIP errors first (AMD GPU)
+        if _is_rocm_error_message(message):
+            if component == 'pyannote':
+                # PyAnnote is already on CPU in ROCm mode
+                self.logn(t('rocm_fallback_cpu', component='PyAnnote'), 'warning')
+                return False
+            elif component == 'whisper':
+                if force_whisper_cpu:
+                    return False
+                self.logn(t('rocm_fallback_cpu', component='Whisper'), 'warning')
+                force_whisper_cpu = True
+                config['force_whisper_cpu'] = 'true'
+                save_config()
+                return True
+        
+        # Check for CUDA errors (NVIDIA GPU)
         if not _is_cuda_error_message(message):
             return False
 

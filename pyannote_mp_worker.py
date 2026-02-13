@@ -71,7 +71,17 @@ def pyannote_proc_entrypoint(args: dict, q):
                 device = 'mps' if platform.mac_ver()[0] >= '12.3' and torch.backends.mps.is_available() else 'cpu'
             elif platform.system() in ('Windows', 'Linux'):
                 try:
-                    device = 'cuda' if torch.cuda.is_available() and torch.cuda.device_count() > 0 else 'cpu'
+                    if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+                        # Check for ROCm/HIP (AMD GPU)
+                        if torch.version.hip:
+                            # In ROCm mode, force PyAnnote to CPU for stability
+                            device = 'cpu'
+                            plog("info", "ROCm (HIP) detected - PyAnnote using CPU for stability")
+                        else:
+                            # Native NVIDIA CUDA
+                            device = 'cuda'
+                    else:
+                        device = 'cpu'
                 except:
                     device = 'cpu'
             else:

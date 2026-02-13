@@ -87,6 +87,9 @@ it:
   loading_whisper: 'Caricamento di whisper'
   pyannote_cuda_retry: 'Rilevato errore CUDA di PyAnnote. Riprovo sulla CPU.'
   whisper_cuda_retry: 'Rilevato errore CUDA di Whisper. Riprovo sulla CPU.'
+  rocm_fallback_cpu: 'Rilevato errore ROCm di %{component}. Passaggio automatico alla CPU.'
+  rocm_detected: 'ROCm (AMD GPU) rilevato - utilizzo accelerazione GPU per Whisper'
+  pyannote_rocm_cpu: 'PyAnnote utilizza CPU per stabilità (modalità ROCm)'
   vad: "Rilevamento dell'attività vocale..."
   language_detect: 'Lingua rilevata "%{lang}" con probabilità %{prob}'
   language_en_only: 'Tieni presente che il modello di IA scelto per la trascrizione è solo in inglese.'
