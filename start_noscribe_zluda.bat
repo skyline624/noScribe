@@ -15,22 +15,22 @@ if "%ZLUDA_PATH%"=="" (
     echo.
     pause
 ) else (
-    echo [✓] ZLUDA_PATH: %ZLUDA_PATH%
+    echo [OK] ZLUDA_PATH: %ZLUDA_PATH%
     set PATH=%ZLUDA_PATH%;%PATH%
-    echo [✓] ZLUDA added to PATH
+    echo [OK] ZLUDA added to PATH
 )
 
 :: Activate virtual environment
-echo [i] Activating virtual environment...
+echo [INFO] Activating virtual environment...
 call venv_zluda\Scripts\activate.bat
 
 :: Check PyTorch
-echo [i] Checking PyTorch installation...
-python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')"
+echo [INFO] Checking PyTorch installation...
+python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available())"
 
 :: Launch noScribe
 echo.
-echo [✓] Starting noScribe...
+echo [OK] Starting noScribe...
 echo ==========================================
 python noScribe.py
 
