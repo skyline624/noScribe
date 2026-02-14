@@ -28,6 +28,12 @@ def pyannote_proc_entrypoint(args: dict, q):
            torch.set_num_threads(1)        
         from pyannote.audio import Pipeline
         from tempfile import TemporaryDirectory
+        
+        # Force soundfile backend for torchaudio (avoids torchcodec issues on Windows)
+        try:
+            torchaudio.set_audio_backend("soundfile")
+        except:
+            pass
 
         def plog(level, msg):
             try:
